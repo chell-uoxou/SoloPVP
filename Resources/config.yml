@@ -1,0 +1,20 @@
+---
+Prifks: PVP
+Interval: 600
+WaitInterval: 10
+MinNumOfPeople: 2
+MaxNumOfPeople: 50
+StartPoint_1:
+  world: ~
+  x: ~
+  "y": ~
+  z: ~
+StartPoint_2:
+  world: ~
+  x: ~
+  "y": ~
+  z: ~
+AllowStatusCommand: false
+ChatInTeam: false
+DoSendBossBer: true
+...

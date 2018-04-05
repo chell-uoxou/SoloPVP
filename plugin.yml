@@ -1,0 +1,11 @@
+name: SoloPVP
+main: SoloPVP\Main
+version: 0.1.0
+api: [3.0.0-ALPHA10,3.0.0-ALPHA9,3.0.0-ALPHA8,3.0.0-ALPHA7]
+author: chell_uoxou
+authors: [chell_uoxou]
+description: Simple SoloPVP System for MCBE
+websites: https://github.com/chell-uoxou/SoloPVP
+commands:
+ spvp:
+  usage: spvp < join | cancel | start | end | add | status | edit >
