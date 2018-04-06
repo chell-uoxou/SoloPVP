@@ -6,14 +6,19 @@ en_US:
  error-gamestart-few-people:  §cSorry, but the game wasn't started because there aren't enough joining players to start.
  error-dont-have-permission:  §cYou don't have permission to use this command.
  error-there-arent-games:     §cThere is no in-progress game.
- admin-made-join-game:        §fAdministrator made you joined to the game.
- you-made-join-game:          Made {%0} joined to the game.
- 0-joined-to-1:               §a{%0}§a joined to this game.
- you-already-joined:          §fYou already have joined to the game.
+ admin-made-join-game:        §fAdministrator made you joined to the {%0}team§f.
+ you-made-join-game:          Made {%0} joined to the {%1}team§f.
+ 0-joined-to-1:               §a{%0}§a joined to {%1} team.
+ your-team-is:                §fYou are {%0} team§f!
+ you-already-joined:          §fYou already have joined to {%0}§f.
  retired:                     §7You retired the game.
  wait-for-starting:           §ePlease wait a seconds until start the game!
+ max-height:                  §cYou can't set any blocks to the height higher than here!
+ your-rank-is:                §aYou are in {%0}
+ your-score:                  "§bkill: §l{%0} §r§7//§c death: §l{%1} §r§7"
 
- status-text:                 "{%0} team §r§7//§b kill: §l{%1} §r§7//§c death: §l{%2} §r§7//§a Team Point: §l{%3} §7// §l§f[§6{%4}§f]"
+
+ status-text:                 "§bkill: §l{%0} §r§7//§c death: §l{%1} §r§7 §7// §l§f[§6{%2}§f]"
 
 
 ja_JP:
@@ -23,12 +28,16 @@ ja_JP:
  error-gamestart-few-people:  §cゲーム開始に必要な参加者最少人数を満たしていないため、ゲームが開始できませんでした。
  error-dont-have-permission:  §cこのコマンドを実行する権限がありません。
  error-there-arent-games:     §c現在、進行中のゲームはありません。
- admin-made-join-game:        §fあなたは管理者によってゲームに参加させられました。
- you-made-join-game:          "{%0}をゲームに参加させました。"
- 0-joined-to-1:               §a{%0}§aさんがゲームに参加しました。
- you-already-joined:          §fあなたはゲームに参加しています。
+ admin-made-join-game:        §fあなたは管理者によって{%0}チーム§fに参加させられました！
+ you-made-join-game:          "{%0}を{%1}チームに参加させました。"
+ 0-joined-to-1:               §a{%0}§aさんが{%1}チームに参加しました。
+ your-team-is:                §fあなたは{%0}チーム§fです！
+ you-already-joined:          §fあなたは既に{%0}チーム§fに所属しています！
  retired:                     §7ゲームをリタイアしました。
  wait-for-starting:           §eゲーム開始までしばらくお待ちください！
+ max-height:                  §cそれ以上の高さにブロックはおけません！
+ your-rank-is:                 §a第{%0}位
+ your-score:                  "§bキル数: §l{%0} §r§7//§c デス数: §l{%1} §r§7"
 
  status-text:                 "{%0}チーム §r§7//§b キル数: §l{%1} §r§7//§c デス数: §l{%2} §r§7//§a チーム得点: §l{%3} §7// §l§f[§6{%4}§f]"
 ---

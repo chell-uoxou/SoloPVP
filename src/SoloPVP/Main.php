@@ -13,7 +13,6 @@ use pocketmine\block\Block;
 use pocketmine\command\ConsoleCommandSender;
 use pocketmine\event\block\BlockBreakEvent;
 use pocketmine\event\block\BlockPlaceEvent;
-use pocketmine\event\entity\EntityRegainHealthEvent;
 use pocketmine\event\player\PlayerDeathEvent;
 use pocketmine\event\player\PlayerRespawnEvent;
 use pocketmine\Player;
@@ -39,7 +38,7 @@ use pocketmine\math\Vector3;
 use pocketmine\nbt\tag\CompoundTag;
 use pocketmine\nbt\tag\IntTag;
 
-use xenialdan\BossBarAPI\API;
+use BossBarAPI\API;
 
 class Main extends PluginBase implements Listener
 {
@@ -49,7 +48,7 @@ class Main extends PluginBase implements Listener
     public $playersData;
     public $messages;
 
-    public $participatingPlayers;
+    public $participatingPlayers = array();
 
     public $prifks = "§a[§dcSoloPVP§a]§f";
 
@@ -90,11 +89,13 @@ class Main extends PluginBase implements Listener
             $message[] = ("[NOTICE]§aデータ保管用のフォルダを作成しました。");
         }
         $this->saveDefaultConfig();
+        $this->saveResource("messages.yml", false);
+        $this->saveResource("players.json", false);
         $this->reloadConfig();
+        $messages_handle = new Config($this->getDataFolder() . "messages.yml", Config::YAML);
+        $this->messages = $messages_handle->getAll();
         $this->config = new Config($this->getDataFolder() . "config.yml", Config::YAML);
         $this->playersStat = new Config($this->getDataFolder() . "players.json", Config::JSON);
-        $this->messages = yaml_parse_file($this->getDataFolder() . "messages.yml");
-
         $getPrifks = $this->config->get("Prifks");
         $this->prifks = "§a[§d{$getPrifks}§a]§f ";
         $messages[] = ("[STATUS]プラグインメッセージ接頭語：" . $this->prifks);
@@ -230,7 +231,7 @@ class Main extends PluginBase implements Listener
                                         $this->sendContainedMessage($player, "wait-for-starting");
                                         $this->sendContainedMessage($sender, "you-made-join-game", [$playerName]);
                                     }
-                                }else{
+                                } else {
                                     $player->sendMessage("§cSomething went wrong while adding player to game.");
                                 }
                             } else {
@@ -335,65 +336,35 @@ class Main extends PluginBase implements Listener
 
     public function sendStatus($args, $sender)
     {
-        if (isset($args[1])) {
-            switch ($args[1]) {
-                case "":
-            }
-        } else {
-            $currentPlayerCount = $this->getTeamPlayersCount(1);
-            $playerLimit = $this->getConfig()->get("MaxNumOfPeople");
-            $playingTeams = array();
-            $playingTeamsText = "";
-
-            if ($this->isPlaying(1) or $this->isPlaying(2)) {
-                $gameStatusText = "§aDuring the game";
-                foreach ($this->teams as $team) {
-                    if ($team["isPlaying"]) {
-                        $playingTeams[] = $team["displayName"];
-                    }
-                }
-                foreach ($playingTeams as $playingTeam) {
-                    if (isset($playingTeams[0])) {
-                        $playingTeamsText .= ", " . $playingTeam;
-                    } else {
-                        $playingTeamsText .= $playingTeam;
-                    }
+        if ($sender instanceof Player or $sender instanceof ConsoleCommandSender)
+            if (isset($args[1])) {
+                switch ($args[1]) {
+                    case "":
                 }
             } else {
-                $gameStatusText = "§6Waiting for join";
-                $playingTeamsText = "N/A";
-            }
-            if (count($this->participatingPlayers) != 0) {
-                $playersInTeam = "";
-                foreach ($this->teams as $team) {
-                    foreach ($team["players"] as $player) {
-                        $playerName = $player->getName();
-                        if ($playersInTeam != "") {
-                            $playersInTeam .= ", §l§f[{$team["displayName"]}§f]§r§a {$playerName}";
-                        } else {
-                            $playersInTeam .= "§l§f[{$team["displayName"]}§f]§r§a {$playerName}";
-                        }
-                    }
+                $participatingPlayersCount = count($this->participatingPlayers);
+                $onlinePlayersCount = count($this->getServer()->getOnlinePlayers());
+                $gamePlayersLimit = $this->getConfig()->get("MaxNumOfPeople");
+                $serverPlayerLimit = $this->getServer()->getMaxPlayers();
+
+                if ($this->isPlaying()) {
+                    $gameStatusText = "§aDuring the game";
+                } else {
+                    $gameStatusText = "§6Waiting for join";
                 }
-                $playersInTeamText = "\n-- Each team players --\n" . $playersInTeam;
-            } else {
-                $playersInTeamText = "";
-            }
 
-            $messages = array(
-                "",
-                "§b=== §fSimple SoloPVP System Status §b===",
-                "  {$teamName1} Team players count : {$currentPlayerCount1}/{$playerLimit}",
-                "  {$teamName2} Team players count : {$currentPlayerCount2}/{$playerLimit}",
-                "  Game status : {$gameStatusText}",
-                "  Playing teams : {$playingTeamsText}",
-                $playersInTeamText
-            );
+                $messages = array(
+                    "",
+                    "§b=== §fSimple SoloPVP System Status §b===",
+                    "  Participating players count : {$participatingPlayersCount}/{$gamePlayersLimit}",
+                    "  Online players count : {$onlinePlayersCount}/{$serverPlayerLimit}",
+                    "  Game status : {$gameStatusText}",
+                );
 
-            foreach ($messages as $message) {
-                $sender->sendMessage($message);
+                foreach ($messages as $message) {
+                    $sender->sendMessage($message);
+                }
             }
-        }
     }
 
     public function editSettings($args, $sender)
@@ -403,7 +374,7 @@ class Main extends PluginBase implements Listener
                 case "pos1":
                     if ($sender instanceof Player) {
                         $result = $this->setPosition("pos1", $sender);
-                        $sender->sendMessage($this->prifks . "TeamID:1 のプレーヤースポーン地点を X:" . $result->getX() . ", Y:" . $result->getY() . ", Z:" . $result->getZ() . " に設定しました。");
+                        $sender->sendMessage($this->prifks . "範囲頂点1を X:" . $result->getX() . ", Y:" . $result->getY() . ", Z:" . $result->getZ() . " に設定しました。");
                     } else {
                         $sender->sendMessage($this->prifks . "§cPlease run this command in-game.");
                     }
@@ -412,7 +383,7 @@ class Main extends PluginBase implements Listener
                 case "pos2":
                     if ($sender instanceof Player) {
                         $result = $this->setPosition("pos2", $sender);
-                        $sender->sendMessage($this->prifks . "TeamID:2 のプレーヤースポーン地点を X:" . $result->getX() . ", Y:" . $result->getY() . ", Z:" . $result->getZ() . " に設定しました。");
+                        $sender->sendMessage($this->prifks . "範囲頂点2を X:" . $result->getX() . ", Y:" . $result->getY() . ", Z:" . $result->getZ() . " に設定しました。");
                     } else {
                         $sender->sendMessage($this->prifks . "§cPlease run this command in-game.");
                     }
@@ -459,6 +430,7 @@ class Main extends PluginBase implements Listener
     public function add($player)
     {
         if ($player instanceof Player && isset($this->participatingPlayers[$player->getName()])) {
+            $this->participatingPlayers[$player->getName()] = $player;
             $this->organizeArrays();
             return true;
         } else {
@@ -518,11 +490,6 @@ class Main extends PluginBase implements Listener
             }
         }
 
-        foreach ($this->teams as $team) {
-            $teamId = $team["id"];
-            $this->setTeamData($teamId, "isPlaying", true);
-        }
-
         $this->isPlaying = true;
 
         $this->brokenBlocks = array();
@@ -572,36 +539,11 @@ class Main extends PluginBase implements Listener
         if ($p instanceof Player) {
             $playerName = $p->getName();
             $this->spreadPlayer($p);
-            if ($this->isPlaying($teamId)) {
-                $this->sendMessageInGame($playerName . "さんが{$teamDisplayName}としてゲームに参加しました！");
-            }
+            $this->sendMessageInGame($playerName . "さんがゲームに参加しました。");
             if ($p->getGamemode() != 1) {
                 $p->setGamemode(0);
                 $this->refillItems($p);
             }
-
-            $he = new EntityRegainHealthEvent($p, 100, EntityRegainHealthEvent::CAUSE_EATING);
-            $p->heal($he);
-
-            $team = $this->getTeamIdFromPlayer($p);
-            switch ($team) {
-                case 1:
-                    $data = $this->getConfig()->get("pos1");
-                    $level = $this->getServer()->getLevelByName($data["world"]);
-                    $pos = new Position($data["x"], $data["y"], $data["z"], $level);
-                    break;
-                case 2:
-                    $data = $this->getConfig()->get("pos2");
-                    $level = $this->getServer()->getLevelByName($data["world"]);
-                    $pos = new Position($data["x"], $data["y"], $data["z"], $level);
-                    break;
-                default:
-                    $pos = $p->getLevel()->getSpawnLocation();
-                    break;
-            }
-
-            $vector = $pos->asVector3();
-            $p->setSpawn($vector);
 
             $this->playersData[$playerName] = array(
                 "kill" => 0,
@@ -611,7 +553,7 @@ class Main extends PluginBase implements Listener
                 "latestCause" => null,
                 "isPlaying" => true
             );
-            $p->addTitle("ゲームスタート！", "§fあなたは{$teamDisplayName}チーム§fです！", $fadein = 0, $duration = 2, $fadeout = 20);
+            $p->addTitle("ゲームスタート！", "", $fadein = 0, $duration = 2, $fadeout = 20);
         }
     }
 
@@ -625,90 +567,96 @@ class Main extends PluginBase implements Listener
             API::removeBossBar($this->getServer()->getOnlinePlayers(), $this->eid);
         }
 
-        $point1 = $this->getTeamPoint(1);
-        $point2 = $this->getTeamPoint(2);
-        switch (true) {
-            case $point1 > $point2:
-                $gameResult = $this->getTeamDisplayName(1) . "チームの勝利";
-                $winnerTeam = $this->getTeamDisplayName(1);
-                break;
-
-            case $point1 < $point2:
-                $gameResult = $this->getTeamDisplayName(2) . "チームの勝利";
-                $winnerTeam = $this->getTeamDisplayName(2);
-                break;
-
-            case $point1 == $point2:
-                if ($point1 == 0) {
-                    $point1 = "0";
-                }
-                if ($point2 == 0) {
-                    $point2 = "0";
-                }
-                $gameResult = "§a引き分け";
-                break;
+        foreach ($this->playersData as $name => $data) {
+            $kills[$name] = $data["kill"];
         }
-        $winLoseRatio = $this->getTeamColor(1) . "$point1 §f: " . $this->getTeamColor(2) . "$point2 §f";
+        asort($kills);
 
-        foreach ($this->participatingPlayers as $p) {
-            if ($p instanceof Player)
+        $ranking = 1;
+        foreach ($kills as $name => $kill) {
+            $this->playersData[$name]["ranking"] = $ranking;
+            $ranking++;
+        }
+
+        foreach ($this->participatingPlayers as $player) {
+            if ($player instanceof Player) {
+                $name = $player->getName();
+                $ranking = $this->playersData[$name]["ranking"];
+                switch ($ranking) {
+                    case 1:
+                        $ranking = "1st";
+                        break;
+                    case 2:
+                        $ranking = "2nd";
+                        break;
+                    case 3:
+                        $ranking = "3rd";
+                        break;
+                    default:
+                        $ranking = $ranking . "th";
+                        break;
+                }
+                $kill = $this->playersData[$name]["kill"];
+                $death = $this->playersData[$name]["death"];
+                $gameResult = $this->getMessage("your-rank-is", $player->getLocale(), [$ranking]);
+                $subtitle = $this->getMessage("your-score", $player->getLocale(), [$kill, $death]);
                 if (!isset($type)) {
-                    $p->addTitle($gameResult . "！", $winLoseRatio, 10, 3, 60);
+                    $player->addTitle($gameResult . "!", $subtitle, 10, 3, 60);
                 } else {
                     switch ($type) {
                         case "too little":
-                            $p->addTitle("§c対戦相手がいません！", $winLoseRatio . "で" . $gameResult . "§fです。", 10, 3, 60);
+                            $this->getMessage();
+                            $player->addTitle("§c対戦相手がいません！", $subtitle . "§f // " . $gameResult, 10, 3, 60);
                             break;
                         case "big deviation":
-                            $p->addTitle("§c人数差が発生しました！", $winLoseRatio . "で" . $gameResult . "§fです。", 10, 3, 60);
+                            $player->addTitle("§c人数差が発生しました！", $subtitle . "§f // " . $gameResult, 10, 3, 60);
                             break;
                     }
                 }
-            $pos = $p->getLevel()->getSpawnLocation();
-            $p->teleport($pos);
-            $p->setSpawn($pos);
-            if ($p->getGamemode() != 1) {
-                $p->getInventory()->clearAll();
-                $p->getArmorInventory()->setHelmet(Item::get(0, 0, 0));
-                $p->getArmorInventory()->setChestplate(Item::get(0, 0, 0));
-                $p->getArmorInventory()->setLeggings(Item::get(0, 0, 0));
-                $p->getArmorInventory()->setBoots(Item::get(0, 0, 0));
-                $p->getArmorInventory()->sendContents($p);
+                $pos = $player->getLevel()->getSpawnLocation();
+                $player->teleport($pos);
+                $player->setSpawn($pos);
+                if ($player->getGamemode() != 1) {
+                    $player->getInventory()->clearAll();
+                    $player->getArmorInventory()->setHelmet(Item::get(0, 0, 0));
+                    $player->getArmorInventory()->setChestplate(Item::get(0, 0, 0));
+                    $player->getArmorInventory()->setLeggings(Item::get(0, 0, 0));
+                    $player->getArmorInventory()->setBoots(Item::get(0, 0, 0));
+                    $player->getArmorInventory()->sendContents($player);
+                }
+                $player->setNameTag($player->getName());
+                $player->setDisplayName($player->getName());
+
+                $this->playersData[$player->getName()]["isPlaying"] = false;
             }
-            $p->setNameTag($p->getName());
-            $p->setDisplayName($p->getName());
 
-            $this->playersData[$p]["isPlaying"] = false;
-        }
+            if (!isset($type)) {
+                $this->getServer()->broadcastMessage($this->prifks . "§aゲーム終了。");
+            } else {
+                switch ($type) {
+                    case "too little":
+                        $this->getServer()->broadcastMessage($this->prifks . "§6ゲームの最小参加人数を下回ったためゲームを終了しました。");
+                        break;
 
-        if (!isset($type)) {
-            $this->getServer()->broadcastMessage($this->prifks . "§aゲーム終了、{$winLoseRatio}で{$gameResult}です。");
-        } else {
-            switch ($type) {
-                case "too little":
-                    $this->getServer()->broadcastMessage($this->prifks . "§6ゲームの最小参加人数を下回ったためゲームを終了しました。");
-                    $this->getServer()->broadcastMessage($this->prifks . "終了段階の試合結果は、{$winLoseRatio}で{$gameResult}です。");
-                    break;
-
-                case "big deviation":
-                    $this->getServer()->broadcastMessage($this->prifks . "§6チームの人数に大きな偏りが生じたためゲームを終了しました。");
-                    $this->getServer()->broadcastMessage($this->prifks . "終了段階の試合結果は、{$winLoseRatio}で{$gameResult}です。");
-                    break;
+                    case "big deviation":
+                        $this->getServer()->broadcastMessage($this->prifks . "§6チームの人数に大きな偏りが生じたためゲームを終了しました。");
+                        break;
+                }
             }
+
+            $this->initPlayersData();
+
+            $this->gameRemainingSeconds = $this->getConfig()->get("Interval");
+
+            $handler = $this->getServer()->getScheduler()->scheduleDelayedTask($this->tasks["GameStartWait"], 20 * 15);
+            $this->taskIDs[] = $handler->getTaskId();
+
+            $this->r_count = 0;
+            $this->getLogger()->info("World restoration started.");
+            $this->tasks["RevivalWorld"]->onRun($this->getServer()->getTick());
+
+            $this->organizeArrays();
         }
-
-        $this->initTeamData();
-
-        $this->gameRemainingSeconds = $this->getConfig()->get("Interval");
-
-        $handler = $this->getServer()->getScheduler()->scheduleDelayedTask($this->tasks["GameStartWait"], 20 * 15);
-        $this->taskIDs[] = $handler->getTaskId();
-
-        $this->r_count = 0;
-        $this->getLogger()->info("World restoration started.");
-        $this->tasks["RevivalWorld"]->onRun($this->getServer()->getTick());
-
-        $this->organizeArrays();
     }
 
     public function attacked(EntityDamageEvent $event)
@@ -727,17 +675,12 @@ class Main extends PluginBase implements Listener
                         $damagerPlayer = $this->getServer()->getPlayer($damagerName);
                         $damagedPlayer = $this->getServer()->getPlayer($damagedName);
 
-                        $damagedTeam = $this->getTeamIdFromPlayer($damagedPlayer);
-                        $damagerTeam = $this->getTeamIdFromPlayer($damagerPlayer);
-
-                        if ($damagerTeam != $damagedTeam) {
-                            $this->playersData[$damagedName]["latestAttacker"] = $damagerName;
-                            $damagerPlayer->sendTip("§a§lAttack! >> {$damagedName}");
-                            $damagedPlayer->sendTip("§c§lDamaged! << {$damagerName}");
-                            $this->playersData[$damagedPlayer->getName()]["latestCause"] = EntityDamageEvent::CAUSE_ENTITY_ATTACK;
-                        } else {
-                            $event->setCancelled();
-                        }
+                        $this->playersData[$damagedName]["latestAttacker"] = $damagerName;
+                        $damagerPlayer->sendTip("§a§lAttack! >> {$damagedName}");
+                        $damagedPlayer->sendTip("§c§lDamaged! << {$damagerName}");
+                        $this->playersData[$damagedPlayer->getName()]["latestCause"] = EntityDamageEvent::CAUSE_ENTITY_ATTACK;
+                    } else {
+                        $event->setCancelled();//ゲーム外のPVPを無効化 @TODO:コンフィグで設定変更
                     }
                 }
                 break;
@@ -753,18 +696,13 @@ class Main extends PluginBase implements Listener
                         $damagerPlayer = $this->getServer()->getPlayer($damagerName);
                         $damagedPlayer = $this->getServer()->getPlayer($damagedName);
 
-                        $damagedTeam = $this->getTeamIdFromPlayer($damagedPlayer);
-                        $damagerTeam = $this->getTeamIdFromPlayer($damagerPlayer);
-
-                        if ($damagerTeam != $damagedTeam) {
-                            $this->playersData[$damagedName]["latestAttacker"] = $damagerName;
-                            $damagerPlayer->sendTip("§a§lAttack! >> {$damagedName}");
-                            $damagerPlayer->getLevel()->addSound(new PopSound($damagerPlayer->getPosition()));
-                            $damagedPlayer->sendTip("§c§lDamaged! << {$damagerName}");
-                            $this->playersData[$damagedPlayer->getName()]["latestCause"] = EntityDamageEvent::CAUSE_PROJECTILE;
-                        } else {
-                            $event->setCancelled();
-                        }
+                        $this->playersData[$damagedName]["latestAttacker"] = $damagerName;
+                        $damagerPlayer->sendTip("§a§lAttack! >> {$damagedName}");
+                        $damagerPlayer->getLevel()->addSound(new PopSound($damagerPlayer->getPosition()));
+                        $damagedPlayer->sendTip("§c§lDamaged! << {$damagerName}");
+                        $this->playersData[$damagedPlayer->getName()]["latestCause"] = EntityDamageEvent::CAUSE_PROJECTILE;
+                    } else {
+                        $event->setCancelled();//ゲーム外のPVPを無効化 @TODO:コンフィグで設定変更
                     }
                 }
                 break;
@@ -774,6 +712,7 @@ class Main extends PluginBase implements Listener
                 break;
         }
     }
+
 
     public function Death(PlayerDeathEvent $event)
     {
@@ -796,7 +735,6 @@ class Main extends PluginBase implements Listener
             $this->sendMessageInGame("0-was-killed-by-1", [$deadName, $killerName]);
             $this->playersData[$deadName]["death"]++;
             $this->playersData[$killerName]["kill"]++;
-            $this->addTeamPoint($this->getTeamIdFromPlayer($killerName), 1);
 
             $event->setDeathMessage("");
         }
@@ -824,9 +762,11 @@ class Main extends PluginBase implements Listener
 
     public function Respawn(PlayerRespawnEvent $event)
     {
-        if ($this->isPlaying($event->getPlayer())) {
-            $this->refillItems($event->getPlayer());
+        $player = $event->getPlayer();
+        if ($this->isPlaying($player)) {
+            $this->refillItems($player);
         }
+        $this->spreadPlayer($player);
     }
 
 //    public function ProjectileLaunch(ProjectileLaunchEvent $event)
@@ -869,22 +809,6 @@ class Main extends PluginBase implements Listener
         }
     }
 
-    public function sendMessageInTeam($message, $team, $toPlaying = false)
-    {
-        if ($toPlaying) {
-            $players = $this->participatingPlayers;
-        } else {
-            $players = $this->getServer()->getOnlinePlayers();
-        }
-
-        foreach ($players as $player) {
-            $playerName = $player->getName();
-            if ($this->getTeamName($this->getTeamIdFromPlayer($playerName)) == $team) {
-                $player->sendMessage($message);
-            }
-        }
-    }
-
     public function isOnlinePlayer($name)
     {
         $return = false;
@@ -897,12 +821,6 @@ class Main extends PluginBase implements Listener
         return $return;
     }
 
-    public function addPlayerToGame($player)
-    {
-        $this->participatingPlayers[] = $player;
-        $this->organizeArrays();
-    }
-
     public function delPlayerFromGame($player)
     {
         $arrayNum = array_search($player, $this->participatingPlayers);
@@ -912,30 +830,37 @@ class Main extends PluginBase implements Listener
 
 /// System /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    public function isPlaying($player = null){
-        if ($player = null){
+    public function isPlaying($player = null)
+    {
+        if ($player = null) {
             return $this->isPlaying;
-        }else{
-            if($player instanceof Player){
+        } else {
+            if ($player instanceof Player) {
                 $playerName = $player->getName();
-            }else{
+            } else {
                 $playerName = $player;
             }
             return $this->playersData[$playerName]["isPlaying"];
         }
     }
+
     public function organizeArrays()
     {
 //        foreach ($this->participatingPlayers as $player) {
 //            //do something
 //        }
         $this->participatingPlayers = array_merge($this->participatingPlayers);
-        
+
         if ($this->isPlaying()) {
             if (count($this->participatingPlayers) <= 1) {
                 $this->end("too little");
             }
         }
+    }
+
+    public function initPlayersData()
+    {
+        $this->playersData = array();
     }
 
     //Score/////////////////////////////////////////////////////////////
@@ -944,33 +869,7 @@ class Main extends PluginBase implements Listener
 
     function onChat(PlayerChatEvent $e)
     {
-        $message = $e->getMessage();
-        $player = $e->getPlayer();
-        $e->setCancelled();
-        $playerName = $player->getName();
-        $teamId = $this->getTeamIdFromPlayer($player);
-        $team = $this->getTeamName($teamId);
-        if ($teamId) {
-            if ($this->config->get("ChatInTeam") == true) {
-                if ($message[0] != "!" and $message[0] != "！") {
-                    $this->sendMessageInTeam($this->getTeamColor($teamId) . "[team]$playerName §r>> §l" . $message . "　", $team);
-                    $this->getLogger()->info($this->getTeamColor($teamId) . "[team]$playerName §r>> §l" . $message . "　");
-                } else {
-                    $message = substr($message, 1);
-                    $this->getServer()->broadcastMessage("§6[chat]§r$playerName >> §l" . $message . "　");
-                }
-            } else {
-                if ($message[0] == "!" or $message[0] == "！") {
-                    $message = substr($message, 1);
-                    $this->sendMessageInTeam($this->getTeamColor($teamId) . "[team]$playerName §r>> §l" . $message . "　", $team);
-                    $this->getLogger()->info($this->getTeamColor($teamId) . "[team]$playerName §r>> §l" . $message . "　");
-                } else {
-                    $this->getServer()->broadcastMessage("§6[chat]§r$playerName >> §l" . $message . "　");
-                }
-            }
-        } else {
-            $this->getServer()->broadcastMessage("§6[chat]§r$playerName >> §l" . $message . "　");
-        }
+
     }
 
     //Scheduler/////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1066,26 +965,24 @@ class Main extends PluginBase implements Listener
 
         switch ($item->getId()) {
             case "298":
-                $player->getInventory()->setArmorItem(0, $item);
+                $player->getArmorInventory()->setHelmet($item);
                 break;
-
 
             case "299":
-                $player->getInventory()->setArmorItem(1, $item);
+                $player->getArmorInventory()->setChestplate($item);
                 break;
 
-
             case "300":
-                $player->getInventory()->setArmorItem(2, $item);
+                $player->getArmorInventory()->setLeggings($item);
                 break;
 
 
             case "301":
-                $player->getInventory()->setArmorItem(3, $item);
+                $player->getArmorInventory()->setBoots($item);
                 break;
         }
 
-        $player->getInventory()->sendArmorContents($player);
+        $player->getArmorInventory()->sendContents($player);
 
         switch ($item->getId()) {
             case "302":
@@ -1111,8 +1008,8 @@ class Main extends PluginBase implements Listener
 
     public function getColorByName(String $name)
     {
-        $colornm = strtoupper($name);
-        switch ($colornm) {
+        $colorNum = strtoupper($name);
+        switch ($colorNum) {
             case "RED":
             case "赤":
                 return "16711680";
@@ -1212,24 +1109,9 @@ class Main extends PluginBase implements Listener
             case "銅":
                 return "9205843";
                 break;
+            default:
+                return false;
+                break;
         }
-    }
-
-    /**
-     * @return array
-     */
-    public function getJsonCommands()
-    {
-        // TODO: Implement getJsonCommands() method.
-    }
-
-    public function setJsonCommands($commands)
-    {
-        // TODO: Implement setJsonCommands() method.
-    }
-
-    public function generateJsonCommands($pluginCmds)
-    {
-        // TODO: Implement generateJsonCommands() method.
     }
 }
